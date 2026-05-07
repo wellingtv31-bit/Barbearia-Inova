@@ -3,136 +3,160 @@ from datetime import date
 import pandas as pd
 import urllib.parse
 
-# --- CONFIGURAÇÃO VISUAL ---
-st.set_page_config(page_title="Barbearia Inova V3.0", layout="wide")
+# --- CONFIGURAÇÃO VISUAL PREMIUM ---
+st.set_page_config(page_title="Inova Pro", page_icon="✂️", layout="wide")
 
-# Estilo para deixar mais profissional (Cores escuras e limpas)
 st.markdown("""
     <style>
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #2E2E2E; color: white; }
-    .stMetric { background-color: #1E1E1E; padding: 15px; border-radius: 10px; border: 1px solid #333; }
+    /* Estilização Geral */
+    .main { background-color: #0e1117; }
+    .stTabs [data-baseweb="tab-list"] { gap: 20px; }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        background-color: #1e1e1e;
+        border-radius: 10px 10px 0px 0px;
+        padding: 10px 20px;
+        color: white;
+    }
+    .stMetric {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 15px;
+        padding: 20px;
+    }
+    /* Cartão de Serviço */
+    .service-card {
+        background-color: #1c2128;
+        padding: 15px;
+        border-radius: 12px;
+        border-left: 5px solid #d4af37;
+        margin-bottom: 10px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- INICIALIZAÇÃO DO BANCO DE DADOS ---
+# --- INICIALIZAÇÃO ---
 for chave in ['vendas', 'fidelidade', 'checkins', 'avaliacoes', 'estoque']:
     if chave not in st.session_state:
-        if chave == 'estoque':
-            st.session_state[chave] = {"Pomada": 10, "Gilete": 50}
+        if chave == 'estoque': st.session_state[chave] = {"Pomada": 10, "Gilete": 50}
         elif chave == 'fidelidade': st.session_state[chave] = {}
         else: st.session_state[chave] = []
 
 if 'logado' not in st.session_state: st.session_state['logado'] = False
 
-# --- DADOS FIXOS ---
+# --- DADOS ---
 PRECOS = {"Corte": 40.0, "Barba": 30.0, "Combo": 60.0, "Sobrancelha": 15.0, "Pezinho": 10.0}
-BARBEIROS = {"Pedro": "👤", "Felipe": "✂️"}
-HORARIOS = ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"]
+BARBEIROS = {"Pedro": "👨🏻‍🚀", "Felipe": "👨🏻‍🎨"}
+HORARIOS = [f"{h:02d}:00" for h in range(8, 19) if h != 12]
 
+# --- APP ---
 def iniciar_app():
-    st.sidebar.title("💈 INOVA V3.0")
-    menu = ["🏠 Início", "📱 Área do Cliente", "🪑 Caixa do Barbeiro", "📊 Painel ADM"]
-    escolha = st.sidebar.selectbox("Ir para:", menu)
+    st.sidebar.image("https://cdn-icons-png.flaticon.com/512/1154/1154564.png", width=100)
+    st.sidebar.title("INOVA PRO")
+    menu = st.sidebar.radio("Navegação", ["🏠 Home", "📅 Agendar", "💰 Caixa", "📊 Gestão"])
 
-    if escolha == "🏠 Início":
-        st.title("✂️ Barbearia Inova")
-        st.info("🎁 A cada 10 cortes, o 11º é GRÁTIS!")
-        c1, c2 = st.columns(2)
-        c1.metric("Barbeiro", "Pedro", "Online")
-        c2.metric("Barbeiro", "Felipe", "Online")
-        st.divider()
-        st.subheader("Tabela de Preços")
-        for s, v in PRECOS.items(): st.write(f"**{s}**: R$ {v:.2f}")
-
-    elif escolha == "📱 Área do Cliente":
-        st.title("📱 Agendamento Online")
-        t1, t2 = st.tabs(["📅 Novo Agendamento", "⭐ Avaliar"])
+    # --- HOME ---
+    if menu == "🏠 Home":
+        st.title("💈 Barbearia Inova")
+        st.subheader("Escolha seu profissional favorito")
         
-        with t1:
-            nome_cliente = st.text_input("Seu Nome")
-            tel_cliente = st.text_input("Seu WhatsApp (com DDD)")
-            col_b, col_h = st.columns(2)
-            barbeiro_p = col_b.selectbox("Barbeiro:", list(BARBEIROS.keys()))
-            hora_p = col_h.selectbox("Horário:", HORARIOS)
-            servs = st.multiselect("Serviços:", list(PRECOS.keys()))
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown(f"<div class='service-card'><h3>{BARBEIROS['Pedro']} Pedro</h3><p>Especialista em Degradê</p></div>", unsafe_allow_html=True)
+        with c2:
+            st.markdown(f"<div class='service-card'><h3>{BARBEIROS['Felipe']} Felipe</h3><p>Mestre da Barba</p></div>", unsafe_allow_html=True)
+        
+        st.divider()
+        st.subheader("📋 Tabela de Serviços")
+        cols = st.columns(len(PRECOS))
+        for i, (serv, preco) in enumerate(PRECOS.items()):
+            cols[i].metric(serv, f"R$ {preco}")
+
+    # --- AGENDAR ---
+    elif menu == "📅 Agendar":
+        st.title("📅 Reserva de Horário")
+        with st.container():
+            nome = st.text_input("Nome completo")
+            whatsapp = st.text_input("WhatsApp (ex: 62999999999)")
             
-            if servs:
-                total = sum(PRECOS[s] for s in servs)
-                pts = st.session_state['fidelidade'].get(tel_cliente, 0)
-                valor_f = 0.0 if pts >= 10 else total * 0.95
+            col1, col2 = st.columns(2)
+            barbeiro = col1.selectbox("Profissional", list(BARBEIROS.keys()))
+            hora = col2.selectbox("Horário disponível", HORARIOS)
+            
+            servicos = st.multiselect("Selecione os serviços", list(PRECOS.keys()))
+            
+            if servicos:
+                total = sum(PRECOS[s] for s in servicos)
+                # Fidelidade
+                pts = st.session_state['fidelidade'].get(whatsapp, 0)
+                valor_final = 0.0 if pts >= 10 else total * 0.95
                 
-                st.write(f"### Total: R$ {valor_f:.2f}")
+                if pts >= 10: st.warning("✨ PARABÉNS! Este corte é por nossa conta!")
+                else: st.info(f"Total com 5% de desconto App: **R$ {valor_final:.2f}**")
                 
-                if st.button("Confirmar Horário"):
-                    if nome_cliente and tel_cliente:
-                        # Salva no sistema
+                if st.button("🚀 Confirmar Agendamento"):
+                    if nome and whatsapp:
                         st.session_state['checkins'].append({
-                            "data": str(date.today()), "hora": hora_p, "cliente": nome_cliente, 
-                            "tel": tel_cliente, "barbeiro": barbeiro_p, "servico": ", ".join(servs), "valor": valor_f
+                            "data": str(date.today()), "hora": hora, "cliente": nome, 
+                            "tel": whatsapp, "barbeiro": barbeiro, "servico": ", ".join(servicos), "valor": valor_final
                         })
-                        
-                        # GERAR LINK DO WHATSAPP (Profissional)
-                        msg = f"Olá {barbeiro_p}! Agendei um {', '.join(servs)} para as {hora_p} hoje. Nome: {nome_cliente}"
-                        link_zap = f"https://wa.me/5599999999999?text={urllib.parse.quote(msg)}" # Substitua pelo seu número
-                        
-                        st.success(f"Agendado para {hora_p}!")
-                        st.markdown(f"[✅ Clique aqui para avisar no WhatsApp]({link_zap})")
-                    else: st.error("Preencha Nome e WhatsApp!")
+                        # Mensagem WhatsApp
+                        texto_zap = urllib.parse.quote(f"Olá! Agendei um {', '.join(servicos)} às {hora} com {barbeiro}. Nome: {nome}")
+                        st.success("Agendado com sucesso!")
+                        st.markdown(f"[📲 Clique aqui para confirmar no WhatsApp](https://wa.me/55{whatsapp}?text={texto_zap})")
+                    else: st.error("Por favor, preencha todos os campos.")
 
-        with t2:
-            st.subheader("Avalie nosso serviço")
-            nota = st.select_slider("Nota:", options=[1, 2, 3], value=3)
-            obs = st.text_area("O que podemos melhorar?")
-            if st.button("Enviar Avaliação"):
-                st.session_state['avaliacoes'].append({"data": str(date.today()), "nota": nota, "obs": obs})
-                st.success("Obrigado!")
-
-    elif escolha == "🪑 Caixa do Barbeiro":
-        st.title("🪑 Lançamento de Atendimento")
+    # --- CAIXA ---
+    elif menu == "💰 Caixa":
+        st.title("💰 Lançamento de Caixa")
         if not st.session_state['logado']:
-            u = st.selectbox("Barbeiro:", list(BARBEIROS.keys()))
-            if st.text_input("Senha", type="password") == "123":
-                if st.button("Entrar"):
-                    st.session_state.update({'logado': True, 'user': u})
+            user = st.selectbox("Barbeiro", list(BARBEIROS.keys()))
+            senha = st.text_input("Senha", type="password")
+            if st.button("Acessar"):
+                if senha == "123":
+                    st.session_state.update({'logado': True, 'user': user})
                     st.rerun()
         else:
-            st.info(f"Logado como: {st.session_state['user']}")
-            serv_caixa = st.multiselect("Serviços:", list(PRECOS.keys()))
-            metodo = st.selectbox("Pagamento:", ["Pix", "Dinheiro", "Cartão"])
+            st.success(f"Logado: {st.session_state['user']}")
+            serv_caixa = st.multiselect("Serviços prestados", list(PRECOS.keys()))
+            pag = st.selectbox("Forma de Pagamento", ["Pix", "Dinheiro", "Cartão"])
+            
             if serv_caixa:
-                total_l = sum(PRECOS[s] for s in serv_caixa) * 0.95
-                if st.button(f"Finalizar Venda (R$ {total_l:.2f})"):
+                total_c = sum(PRECOS[s] for s in serv_caixa) * 0.95
+                if st.button(f"Finalizar Atendimento (R$ {total_c:.2f})"):
                     st.session_state['vendas'].append({
                         "data": str(date.today()), "barbeiro": st.session_state['user'], 
-                        "valor": total_l, "pagamento": metodo, "comissao": total_l * 0.5
+                        "valor": total_c, "pagamento": pag
                     })
                     st.success("Venda registrada!")
-            if st.button("Sair"):
+            
+            if st.button("Deslogar"):
                 st.session_state['logado'] = False
                 st.rerun()
 
-    elif escolha == "📊 Painel ADM":
+    # --- GESTÃO ---
+    elif menu == "📊 Gestão":
+        st.title("📊 Painel Administrativo")
         if st.text_input("Senha ADM", type="password") == "123":
-            aba1, aba2, aba3 = st.tabs(["📅 Agenda", "💰 Finanças", "📦 Estoque"])
+            t_age, t_fin, t_feed = st.tabs(["📅 Agenda", "💵 Financeiro", "⭐ Feedback"])
             
-            with aba1:
+            with t_age:
+                if not st.session_state['checkins']: st.write("Agenda vazia.")
                 for i, c in enumerate(st.session_state['checkins']):
-                    st.write(f"⏰ {c['hora']} - {c['cliente']} ({c['servico']})")
-                    if st.button("Confirmar", key=f"c_{i}"):
-                        st.session_state['fidelidade'][c['tel']] = st.session_state['fidelidade'].get(c['tel'], 0) + 1
-                        st.session_state['vendas'].append(c)
-                        st.session_state['checkins'].pop(i)
-                        st.rerun()
-
-            with aba2:
-                if st.session_state['vendas']:
-                    df = pd.DataFrame(st.session_state['vendas'])
-                    st.metric("Faturamento", f"R$ {df['valor'].sum():.2f}")
-                    st.dataframe(df)
+                    with st.expander(f"{c['hora']} - {c['cliente']}"):
+                        st.write(f"Barbeiro: {c['barbeiro']} | {c['servico']}")
+                        if st.button("Confirmar Presença e Pontuar", key=f"c_{i}"):
+                            st.session_state['fidelidade'][c['tel']] = st.session_state['fidelidade'].get(c['tel'], 0) + 1
+                            st.session_state['vendas'].append(c)
+                            st.session_state['checkins'].pop(i)
+                            st.rerun()
             
-            with aba3:
-                for item, qtd in st.session_state['estoque'].items():
-                    st.session_state['estoque'][item] = st.number_input(f"Qtd {item}", value=qtd)
+            with t_fin:
+                df = pd.DataFrame(st.session_state['vendas'])
+                if not df.empty:
+                    st.metric("Faturamento do Dia", f"R$ {df['valor'].sum():.2f}")
+                    st.dataframe(df)
+                else: st.write("Nenhuma venda hoje.")
 
 if __name__ == "__main__":
     iniciar_app()
